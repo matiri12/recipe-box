@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="思考の整理">
+<meta name="apple-mobile-web-app-title" content="思考ノート">
 <meta name="theme-color" content="#000000">
-<title>思考の整理</title>
+<title>思考ノート</title>
 <style>
 :root{--ink:#000;--paper:#fff;--hi:#ffe600;--sub:#555;--bd:3px solid var(--ink);--sh:5px 5px 0 var(--ink)}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -71,7 +71,7 @@ a{color:var(--ink);font-weight:700;word-break:break-all}
 <body>
 <header>
   <div class="bar">
-    <h1>思考の整理</h1>
+    <h1>思考ノート</h1>
     <input id="q" class="field" type="search" placeholder="タイトル・本文・ジャンル・タグを検索" autocomplete="off">
     <button class="btn" id="menuBtn" aria-label="データ管理">管理</button>
   </div>
@@ -103,6 +103,11 @@ a{color:var(--ink);font-weight:700;word-break:break-all}
   <label for="bk">JSON（書き出し・貼り付け共用）</label>
   <textarea id="bk" class="field" style="min-height:120px;font-size:13px" spellcheck="false" placeholder="ここにバックアップJSONを貼り付けて「復元」"></textarea>
   <div class="acts" style="margin-top:10px"><button class="btn dng" id="doImport">この内容で復元（上書き）</button></div>
+
+  <label for="ad">追加取り込み（既存のノートは残ります）</label>
+  <p class="note">JSON、または1行1件の「ジャンル｜タイトル｜本文｜タグ、タグ」形式。同じジャンルとタイトルは重複として飛ばします。</p>
+  <textarea id="ad" class="field" style="min-height:120px;font-size:13px" spellcheck="false"></textarea>
+  <div class="acts" style="margin-top:10px"><button class="btn pri" id="doAdd">追加する</button></div>
 
   <label>ジャンル管理</label>
   <div id="catMng"></div>
@@ -339,6 +344,20 @@ function importJSON(){
   S.cats=Array.isArray(d.cats)?d.cats.map(String):[];
   save();push({action:'replaceAll',notes:S.notes});F={q:'',cat:'',tags:[],limit:PAGE};$('q').value='';render();drawMng();toast('復元しました');
 }
+function addImport(){
+  var raw=$('ad').value.trim();if(!raw){toast('貼り付けてください');return}
+  var list=[];
+  if(raw[0]==='['||raw[0]==='{'){try{var d=JSON.parse(raw);list=Array.isArray(d)?d:(d.notes||[])}catch(e){toast('JSONの形式が正しくありません');return}}
+  else raw.split(/\r?\n/).forEach(function(l){l=l.trim();if(!l||l[0]==='#')return;var f=l.split('｜');if(f.length<2)return;
+    list.push({category:f[0].trim(),title:f[1].trim(),content:(f[2]||'').trim(),tags:(f[3]||'').split(/[,、，]/).map(function(x){return x.trim()}).filter(Boolean)})});
+  var seen={},ids={};S.notes.forEach(function(n){seen[n.category+'\n'+n.title]=1;ids[n.id]=1});
+  var now=Date.now(),add=0,dup=0;
+  list.forEach(function(n,i){
+    var x=norm({id:n.id||uid(),title:n.title,category:n.category,tags:n.tags,content:n.content,url:n.url,updated:n.updated||now-i*1000}),k=x.category+'\n'+x.title;
+    if(ids[x.id]||seen[k]){dup++;return}ids[x.id]=seen[k]=1;S.notes.push(x);add++});
+  if(add){save();push({action:'replaceAll',notes:S.notes});render();drawMng()}
+  $('ad').value='';toast(add+'件を追加'+(dup?'（重複'+dup+'件はスキップ）':''));
+}
 function mngRow(name,count,onRename,onDel){
   var r=el('div','mrow');r.appendChild(el('span',null,name+'（'+count+'）'));
   var g=el('span');var a=el('button','btn sm','名前変更'),b=el('button','btn sm','削除');
@@ -379,7 +398,7 @@ function drawMng(){
 var qt;$('q').addEventListener('input',function(e){clearTimeout(qt);var v=e.target.value;qt=setTimeout(function(){F.q=v;F.limit=PAGE;render()},120)});
 $('fab').onclick=function(){openForm(null)};
 $('menuBtn').onclick=function(){$('sUrl').value=CFG?CFG.u:'';$('sKey').value=CFG?CFG.k:'';drawMng();openOv('ovData')};
-$('doExport').onclick=exportJSON;$('doImport').onclick=importJSON;
+$('doAdd').onclick=addImport;$('doExport').onclick=exportJSON;$('doImport').onclick=importJSON;
 $('addCat').onclick=function(){var v=$('newCat').value.trim();if(!v)return;if(S.cats.indexOf(v)<0&&allCats().indexOf(v)<0){S.cats.push(v);save()}$('newCat').value='';render();drawMng()};
 document.querySelectorAll('[data-close]').forEach(function(b){b.onclick=function(){closeOv('ovData')}});
 ['ovNote','ovData'].forEach(function(id){$(id).addEventListener('click',function(e){if(e.target===this&&id==='ovData')closeOv(id)})});
